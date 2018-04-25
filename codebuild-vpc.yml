@@ -1,0 +1,261 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CodeBuild VPC stack, creates a VPC with all the requirements for CodeBuild.'
+
+Parameters:
+  VPCIpRange:
+    Default: 10.42.0.0/16
+    Description: The internal IPv4 IP range of the VPC
+    Type: String
+  VPCName:
+    Default: "CodeBuild"
+    Description: "The name of the VPC"
+    Type: String
+  VPCSingleGateway:
+    Default: "yes"
+    Description: "Do you wish to use a single NAT Gateway to save costs?"
+    Type: String
+    AllowedValues: ["yes", "no"]
+
+Conditions:
+  # Do we want multiple NAT Gateways or not?
+  SingleGateway: !Equals [ !Ref VPCSingleGateway, "yes" ]
+  MultipleGateways: !Equals [ !Ref VPCSingleGateway, "no" ]
+
+Resources:
+  # Create the VPC, 2 public subnets, and 2 private subnets
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VPCIpRange
+      Tags:
+        - Key: Name
+          Value: !Ref VPCName
+  SubnetPublicA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - -  !Ref 'AWS::Region'
+          -  a
+      CidrBlock: !Select [0, !Cidr [!Ref VPCIpRange, 256, 8]]
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+          - '-'
+          - -  !Ref VPCName
+            -  'public'
+            - 'a'
+  SubnetPublicB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - -  !Ref 'AWS::Region'
+          -  b
+      CidrBlock: !Select [1, !Cidr [!Ref VPCIpRange, 256, 8]]
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+          - '-'
+          - -  !Ref VPCName
+            -  'public'
+            - 'b'
+  SubnetPrivateA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - -  !Ref 'AWS::Region'
+          -  a
+      CidrBlock: !Select [2, !Cidr [!Ref VPCIpRange, 256, 8]]
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+          - '-'
+          - -  !Ref VPCName
+            -  'private'
+            - 'a'
+  SubnetPrivateB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Join
+        - ''
+        - -  !Ref 'AWS::Region'
+          -  b
+      CidrBlock: !Select [3, !Cidr [!Ref VPCIpRange, 256, 8]]
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+          - '-'
+          - -  !Ref VPCName
+            -  'private'
+            - 'b'
+
+  # We need a secure security group for use with CodeBuild
+  SecureSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Join
+        - '-'
+        - - !Ref VPCName
+          - SecureGroup
+      GroupDescription: Secure security group, not allowing any inbound traffic
+      VpcId: !Ref VPC
+
+  # Create Internet Gateway and make public subnets use that
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+          - '-'
+          - - !Ref VPCName
+            - public
+  InternetRoutePublic:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTablePublic
+  AssignPublicRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublicA
+      RouteTableId: !Ref RouteTablePublic
+  AssignPublicRouteTableB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublicB
+      RouteTableId: !Ref RouteTablePublic
+
+  # Create NAT Gateways for the private subnets.
+  # If SingleGateway is active, we only create one, otherwise two
+  EIPNatGatewayA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    DependsOn: EIPNatGatewayA
+    Properties:
+      AllocationId: !GetAtt ["EIPNatGatewayA", "AllocationId"]
+      SubnetId: !Ref SubnetPublicA
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref VPCName
+              - NATGateway
+              - a
+  RouteTablePrivateA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !If 
+            - SingleGateway
+            - !Join
+              - '-'
+              - - !Ref VPCName
+                - private
+            - !Join
+              - '-'
+              - - !Ref VPCName
+                - private
+                - a
+  InternetRoutePrivateA:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+      RouteTableId: !Ref RouteTablePrivateA
+  AssignPrivateRouteTableA:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateA
+      RouteTableId: !Ref RouteTablePrivateA
+
+  # Optionally create the second gateway
+  EIPNatGatewayB:
+    Condition: MultipleGateways
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  NatGatewayB:
+    Condition: MultipleGateways
+    Type: AWS::EC2::NatGateway
+    DependsOn: EIPNatGatewayB
+    Properties:
+      AllocationId: !GetAtt ["EIPNatGatewayB", "AllocationId"]
+      SubnetId: !Ref SubnetPublicB
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref VPCName
+              - NATGateway
+              - a
+  RouteTablePrivateB:
+    Condition: MultipleGateways
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Join
+            - '-'
+            - - !Ref VPCName
+              - private
+              - b
+  InternetRoutePrivateB:
+    Condition: MultipleGateways
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+      RouteTableId: !Ref RouteTablePrivateB
+  
+  # Assign private subnet B depending on whether it's a single gateway setup or multiple
+  AssignPrivateRouteTableB:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivateB
+      RouteTableId: !If [ SingleGateway, !Ref RouteTablePrivateA, !Ref RouteTablePrivateB]
+
+Outputs:
+  VpcId: 
+    Description: The ID of the VPC
+    Value: !Ref VPC
+  PrivateSubnets: 
+    Description: List of the private subnets
+    Value: !Join
+      - ','
+      - - !Ref SubnetPrivateA
+        - !Ref SubnetPrivateB
+  PublicSubnets: 
+    Description: List of the public subnets
+    Value: !Join
+      - ','
+      - - !Ref SubnetPublicA
+        - !Ref SubnetPublicB
+  SecurityGroupId:
+    Description: Security group that doesn't allow incoming traffic
+    Value: !Ref SecureSecurityGroup
