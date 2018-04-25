@@ -1,0 +1,153 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Build pipeline for Bastion containers'
+
+Parameters:
+  BastionECRRepositoryName:
+    Default: bastion
+    Description: The name of the ECR repository for your bastion hosts (needs to exist)
+    Type: String
+  BastionUser:
+    Description: The id of the user for whom the container is built
+    Type: String
+    AllowedPattern: ^[A-Za-z0-9]*$
+    ConstraintDescription: must contain only alphanumeric characters and numbers.
+    MaxLength: 20
+    MinLength: 1
+  SourceCodeUrl:
+    Description: The GitHub URL containing the build pipeline source code
+    Type: String
+    Default: https://github.com/ArjenSchwarz/fargate-bastion
+  CodeBuildSpecFile:
+    Description: The location/name of the buildspec file
+    Type: String
+    Default: docker/buildspec.yml
+  CodeBuildName:
+    Description: The name of your codebuild project
+    AllowedPattern: ^[-_A-Za-z0-9]*$
+    ConstraintDescription: CodeBuild names must be 2 to 255 characters. They can include letters, numbers, and the special characters - and _.
+    Type: String
+  CodeBuildVPC:
+    Description: The ID of the VPC to run Codebuild in
+    Type: AWS::EC2::VPC::Id
+  CodeBuildSubnets:
+    Description: A list of private subnets (requires a NAT Gateway)
+    Type: List<AWS::EC2::Subnet::Id>
+  CodeBuildSecurityGroups:
+    Description: A list of securitygroups (requires outgoing internet access)
+    Type: List<AWS::EC2::SecurityGroup::Id>
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: CodeBuild information
+      Parameters:
+      - CodeBuildName
+      - CodeBuildVPC
+      - CodeBuildSubnets
+      - CodeBuildSecurityGroups
+      - SourceCodeUrl
+      - CodeBuildSpecFile
+    - Label:
+        default: Bastion information
+      Parameters:
+      - BastionECRRepositoryName
+      - BastionUser
+
+Resources:
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref CodeBuildName
+      ServiceRole: !Ref CodeBuildRole
+      Artifacts:
+        Type: NO_ARTIFACTS
+      BadgeEnabled: 'true'
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:17.09.0
+        EnvironmentVariables:
+          - Name: IMAGE_REPO_NAME
+            Value: !Ref BastionECRRepositoryName
+            Type: PLAINTEXT
+          - Name: BASTION_USER
+            Value: !Ref BastionUser
+            Type: PLAINTEXT
+      Source:
+        Type: GITHUB
+        Auth:
+          Type: OAUTH
+        GitCloneDepth: 1
+        Location: !Ref SourceCodeUrl
+        BuildSpec: !Ref CodeBuildSpecFile
+      TimeoutInMinutes: 10
+      VpcConfig:
+        VpcId: !Ref CodeBuildVPC
+        Subnets: !Ref CodeBuildSubnets
+        SecurityGroupIds: !Ref CodeBuildSecurityGroups
+  CodeBuildRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+          - Action: ['sts:AssumeRole']
+            Effect: Allow
+            Principal:
+              Service: [codebuild.amazonaws.com]
+          Version: '2012-10-17'
+        Path: /
+        Policies:
+          - PolicyName: CodeBuildAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Action:
+                    - 'logs:*'
+                    - 'ec2:CreateNetworkInterface'
+                    - 'ec2:DescribeNetworkInterfaces'
+                    - 'ec2:DeleteNetworkInterface'
+                    - 'ec2:DescribeSubnets'
+                    - 'ec2:DescribeSecurityGroups'
+                    - 'ec2:DescribeDhcpOptions'
+                    - 'ec2:DescribeVpcs'
+                    - 'ec2:CreateNetworkInterfacePermission'
+                  Effect: Allow
+                  Resource: '*'
+                - Action:
+                    - 'ssm:GetParameter'
+                  Effect: Allow
+                  Resource:
+                    - !Join
+                      - ':'
+                      - - 'arn:aws:ssm'
+                        - !Ref 'AWS::Region'
+                        - !Ref 'AWS::AccountId'
+                        - 'parameter/accesskeys/bastion/*'
+                - Action:
+                    - 'ecr:GetAuthorizationToken'
+                  Effect: Allow
+                  Resource: '*'
+                - Action:
+                    - 'ecr:GetDownloadUrlForLayer'
+                    - 'ecr:BatchGetImage'
+                    - 'ecr:CompleteLayerUpload'
+                    - 'ecr:DescribeImages'
+                    - 'ecr:UploadLayerPart'
+                    - 'ecr:InitiateLayerUpload'
+                    - 'ssm:GetParameter'
+                    - 'ecr:BatchCheckLayerAvailability'
+                    - 'ecr:GetRepositoryPolicy'
+                    - 'ecr:PutImage'
+                  Effect: Allow
+                  Resource:
+                    - !Join
+                      - ':'
+                      - - 'arn:aws:ecr'
+                        - !Ref 'AWS::Region'
+                        - !Ref 'AWS::AccountId'
+                        - !Join
+                          - '/'
+                          - -  repository
+                            -  !Ref BastionECRRepositoryName
