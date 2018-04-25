@@ -9,6 +9,7 @@ phases:
     commands:
       - echo Build started on `date`
       - cd docker
+      - env
       - echo Retrieving the recipients public key
       - aws ssm get-parameter --name /accesskeys/bastion/$IMAGE_TAG --query 'Parameter.Value' --output text > publickey
       - echo Building the Docker image...          
