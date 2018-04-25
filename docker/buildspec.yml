@@ -11,12 +11,12 @@ phases:
       - cd docker
       - export AWS_ACCOUNT_ID=$(echo $CODEBUILD_BUILD_ARN | cut -f5 -d:)
       - echo Retrieving the recipients public key
-      - aws ssm get-parameter --name /accesskeys/bastion/$IMAGE_TAG --query 'Parameter.Value' --output text > publickey
+      - aws ssm get-parameter --name /accesskeys/bastion/$BASTION_USER --query 'Parameter.Value' --output text > publickey
       - echo Building the Docker image...          
-      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .
-      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG      
+      - docker build -t $IMAGE_REPO_NAME:$BASTION_USER .
+      - docker tag $IMAGE_REPO_NAME:$BASTION_USER $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$BASTION_USER      
   post_build:
     commands:
       - echo Build completed on `date`
       - echo Pushing the Docker image...
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$IMAGE_TAG
+      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:$BASTION_USER
