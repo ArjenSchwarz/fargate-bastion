@@ -151,3 +151,6 @@ Resources:
                           - '/'
                           - -  repository
                             -  !Ref BastionECRRepositoryName
+Outputs:
+  CodeBuildProject:
+    Value: !Ref CodeBuildProject
