@@ -9,7 +9,7 @@ phases:
     commands:
       - echo Build started on `date`
       - cd docker
-      - env
+      - export AWS_ACCOUNT_ID=$(echo $CODEBUILD_BUILD_ARN | cut -f5 -d:)
       - echo Retrieving the recipients public key
       - aws ssm get-parameter --name /accesskeys/bastion/$IMAGE_TAG --query 'Parameter.Value' --output text > publickey
       - echo Building the Docker image...          
