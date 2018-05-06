@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Lambda and API Gateway part of the Fargate Bastions
+Parameters:
+  BastionCluster:
+    Type: String
+    Description: What is the name of the Bastion Cluster?
+    Default: fargatetests
+  BastionSubnets:
+    Type: String
+    Description: The list of public subnets you want the bastions to appear in
+    Default: subnet-a297778c,subnet-e9ea40a3
+  BastionVpc:
+    Type: String
+    Description: The vpc of the public subnets
+    Default: vpc-cf7738b4
+Resources:
+  CreateBastion:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.lambda_handler
+      Runtime: python2.7
+      CodeUri: ./create-bastion
+      Description: Creates a bastion server
+      Environment:
+        Variables:
+          BASTION_CLUSTER: !Ref BastionCluster
+          BASTION_SUBNETS: !Ref BastionSubnets
+          BASTION_VPC: !Ref BastionVpc
+      Events:
+        CreateBastion:
+          Type: Api
+          Properties:
+            Path: /
+            Method: post
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'ecs:*'
+                - 'ec2:*'
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - 'iam:PassRole'
+              Resource: '*'

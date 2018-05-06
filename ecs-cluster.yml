@@ -1,0 +1,13 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Creates an empty ECS Cluster
+Parameters:
+  ECSClusterName:
+    Description: 'The name of your ECS Cluster'
+    Type: String
+    Default: Fargate-Bastions
+Resources:
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ECSClusterName
