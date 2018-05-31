@@ -9,11 +9,11 @@ Parameters:
   BastionSubnets:
     Type: String
     Description: The list of public subnets you want the bastions to appear in
-    Default: subnet-a297778c,subnet-e9ea40a3
+    Default: subnet-7dbf7153,subnet-8fb121c5
   BastionVpc:
     Type: String
     Description: The vpc of the public subnets
-    Default: vpc-cf7738b4
+    Default: vpc-9fe3e3e4
 Resources:
   CreateBastion:
     Type: AWS::Serverless::Function
@@ -22,6 +22,7 @@ Resources:
       Runtime: python2.7
       CodeUri: ./create-bastion
       Description: Creates a bastion server
+      Timeout: 30
       Environment:
         Variables:
           BASTION_CLUSTER: !Ref BastionCluster
