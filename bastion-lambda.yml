@@ -14,6 +14,10 @@ Parameters:
     Type: String
     Description: The vpc of the public subnets
     Default: vpc-9fe3e3e4
+  CleanupSchedule:
+    Type: String
+    Description: What is the schedule for automated deletion of all bastions?
+    Default: "cron(0 14 * * ? *)"
 Resources:
   CreateBastion:
     Type: AWS::Serverless::Function
@@ -101,6 +105,48 @@ Resources:
         Variables:
           BASTION_CLUSTER: !Ref BastionCluster
           BASTION_VPC: !Ref BastionVpc
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - 'ec2:DeleteSecurityGroup'
+                - 'ec2:DescribeNetworkInterfaces'
+                - 'ec2:DescribeSecurityGroups'
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - 'ecs:StopTask'
+                - 'ecs:ListTask*'
+                - 'ecs:DescribeTask*'
+              Resource: '*'
+              Condition:
+                ArnEquals:
+                  "ecs:cluster": !Join
+                    - ''
+                    - - 'arn:aws:ecs:'
+                      - !Ref "AWS::Region"
+                      - ':'
+                      - !Ref "AWS::AccountId"
+                      - ':cluster/'
+                      - !Ref BastionCluster
+  DeleteAllBastions:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.lambda_handler
+      Runtime: python2.7
+      CodeUri: ./delete-all-bastions
+      Description: Function that deletes all bastions
+      Timeout: 120
+      Environment:
+        Variables:
+          BASTION_CLUSTER: !Ref BastionCluster
+          BASTION_VPC: !Ref BastionVpc
+      Events:
+        CleanupTrigger:
+          Type: Schedule
+          Properties:
+            Schedule: !Ref CleanupSchedule
       Policies:
         - Version: '2012-10-17'
           Statement:
