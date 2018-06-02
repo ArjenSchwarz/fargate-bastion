@@ -66,7 +66,6 @@ def lambda_handler(event, context):
             ip = eni_description['NetworkInterfaces'][0]['Association']['PublicIp']
 
             return ipResponse(ip)
-        return failResponse('No running bastion found')
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidGroup.NotFound':
             print("SecurityGroup doesn't exist yet")
