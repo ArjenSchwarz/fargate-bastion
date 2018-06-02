@@ -5,15 +5,13 @@ Parameters:
   BastionCluster:
     Type: String
     Description: What is the name of the Bastion Cluster?
-    Default: fargatetests
+    Default: default
   BastionSubnets:
     Type: String
     Description: The list of public subnets you want the bastions to appear in
-    Default: subnet-7dbf7153,subnet-8fb121c5
   BastionVpc:
     Type: String
     Description: The vpc of the public subnets
-    Default: vpc-9fe3e3e4
   CleanupSchedule:
     Type: String
     Description: What is the schedule for automated deletion of all bastions?
