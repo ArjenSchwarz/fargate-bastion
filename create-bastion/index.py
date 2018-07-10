@@ -14,6 +14,13 @@ subnet_string = os.environ['BASTION_SUBNETS']
 subnet_array = subnet_string.split(',')
 vpc = os.environ['BASTION_VPC']
 
+ssh_port = 22
+
+ecs_task_memory_reservation_mb = 512
+ecs_task_memory_hardlimit_mb = '512'
+ecs_task_cpu = '256'
+
+
 def ipResponse(ip):
     response = {}
     response['statusCode'] = 200
@@ -33,15 +40,60 @@ def lambda_handler(event, context):
     ecs = boto3.client('ecs')
 
     bastion_name = 'bastion-' + user
+    ecr_image_name = 'fargate_bastion:%s' % user
+
+    # Ensure ECS Task Definition exitst
+    res = ecs.list_task_definitions(familyPrefix=bastion_name)
+    if not res.get('taskDefinitionArns'):
+        try:
+            res  = ecs.register_task_definition(
+                family = bastion_name,
+                requiresCompatibilities = ['FARGATE'],
+                #taskRoleArn = ...
+                #executionRoleArn = ...
+                networkMode = 'awsvpc',
+                cpu = cpu,
+                memory = memory_hardlimit_mb,
+                containerDefinitions = [{
+                    'name': bastion_name,
+                    'image': ecr_image_name,
+                    # Leave host port dynamic ...
+                    'portMappings': [{'containerPort': ssh_port, 'protocol': 'tcp'}],
+                    'memoryReservation': memory_reservation_mb,
+                }]
+            )
+        except ClientError as e:
+            failResponse(e.response)
+
+    # Ensure Security Group exists
+    sg_response = ec2.describe_security_groups(
+        Filters=[
+            {'Name': 'vpc-id', 'Values': [vpc]},
+            {'Name': 'group-name', 'Values': [bastion_name]}
+        ]
+    )
+    if sg_response.get('SecurityGroups'):
+        sg = sg_response.get('SecurityGroups')[0]['GroupId']
+    else:
+        # Create the security group
+        sg_response = ec2.create_security_group(
+            Description='Bastion access for ' + user,
+            GroupName=bastion_name,
+            VpcId=vpc
+        )
+        sg = sg_response['GroupId']
+
+        # Add the ingress rule to it
+        ec2.authorize_security_group_ingress(
+            CidrIp=ip,
+            FromPort=22,
+            GroupId=sg,
+            IpProtocol='tcp',
+            ToPort=22
+        )
 
     try:
         # Check if everything already exists, if so return that
-        ec2.describe_security_groups(
-            Filters=[
-                {'Name': 'vpc-id', 'Values': [vpc]},
-                {'Name': 'group-name', 'Values': [bastion_name]}
-            ]
-        )
         # TODO: check that the IPs still match, otherwise switch them out
         running_tasks = ecs.list_tasks(
             cluster=bastion_cluster,
@@ -71,24 +123,6 @@ def lambda_handler(event, context):
             print("SecurityGroup doesn't exist yet")
         else:
             failResponse(e.response)
-
-    # Create the security group
-    sg_response = ec2.create_security_group(
-        Description='Bastion access for ' + user,
-        GroupName=bastion_name,
-        VpcId=vpc
-    )
-
-    sg = sg_response['GroupId']
-
-    # Add the ingress rule to it
-    ec2.authorize_security_group_ingress(
-        CidrIp=ip,
-        FromPort=22,
-        GroupId=sg,
-        IpProtocol='tcp',
-        ToPort=22
-    )
 
     # Start the bastion container
     response = ecs.run_task(
