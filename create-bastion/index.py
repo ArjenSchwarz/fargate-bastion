@@ -14,6 +14,13 @@ subnet_string = os.environ['BASTION_SUBNETS']
 subnet_array = subnet_string.split(',')
 vpc = os.environ['BASTION_VPC']
 
+ssh_port = 22
+
+ecs_task_memory_reservation_mb = 512
+ecs_task_memory_hardlimit_mb = '512'
+ecs_task_cpu = '256'
+
+
 def ipResponse(ip):
     response = {}
     response['statusCode'] = 200
@@ -33,6 +40,30 @@ def lambda_handler(event, context):
     ecs = boto3.client('ecs')
 
     bastion_name = 'bastion-' + user
+    ecr_image_name = 'fargate_bastion:%s' % user
+
+    # Ensure ECS Task Definition exitst
+    res = ecs.list_task_definitions(familyPrefix=bastion_name)
+    if not res.get('taskDefinitionArns'):
+        try:
+            res  = ecs.register_task_definition(
+                family = bastion_name,
+                requiresCompatibilities = ['FARGATE'],
+                #taskRoleArn = ...
+                #executionRoleArn = ...
+                networkMode = 'awsvpc',
+                cpu = cpu,
+                memory = memory_hardlimit_mb,
+                containerDefinitions = [{
+                    'name': bastion_name,
+                    'image': ecr_image_name,
+                    # Leave host port dynamic ...
+                    'portMappings': [{'containerPort': ssh_port, 'protocol': 'tcp'}],
+                    'memoryReservation': memory_reservation_mb,
+                }]
+            )
+        except ClientError as e:
+            failResponse(e.response)
 
     try:
         # Check if everything already exists, if so return that
