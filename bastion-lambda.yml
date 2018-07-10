@@ -51,7 +51,14 @@ Resources:
                 - 'ecs:RunTask'
                 - 'ecs:ListTask*'
                 - 'ecs:DescribeTask*'
-              Resource: '*'
+              Resource:
+                - !Join
+                  - ''
+                  - - 'arn:aws:ecs:'
+                    - !Ref "AWS::Region"
+                    - ':'
+                    - !Ref "AWS::AccountId"
+                    - ':task-definition/bastion-*'
               Condition:
                 ArnEquals:
                   "ecs:cluster": !Join
