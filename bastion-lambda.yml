@@ -5,7 +5,7 @@ Parameters:
   BastionCluster:
     Type: String
     Description: What is the name of the Bastion Cluster?
-    Default: default
+    Default: Fargate-Bastions
   BastionSubnets:
     Type: String
     Description: The list of public subnets you want the bastions to appear in
@@ -246,7 +246,6 @@ Resources:
                       - !Ref "AWS::AccountId"
                       - ':cluster/'
                       - !Ref BastionCluster
-
 
             # Only Stop tasks prefixed with 'bastion-'
             - Effect: Allow
