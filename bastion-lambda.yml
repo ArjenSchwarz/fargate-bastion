@@ -171,7 +171,6 @@ Resources:
                       - ':cluster/'
                       - !Ref BastionCluster
 
-
             # Only Stop tasks prefixed with 'bastion-'
             - Effect: Allow
               Action:
