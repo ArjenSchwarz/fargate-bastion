@@ -49,10 +49,16 @@ Resources:
                 - 'ec2:CreateSecurityGroup'
               Resource: '*'
 
+            # List ALL task definitions (can't limit per-cluster)
+            - Effect: Allow
+              Action:
+                - 'ecs:ListTaskDefinitions'
+              Resource: '*'
+
             # List and Describe all ECS tasks in the bastion cluster
             - Effect: Allow
               Action:
-                - 'ecs:ListTask*'
+                - 'ecs:ListTask'
                 - 'ecs:DescribeTask*'
               Resource: '*'
               Condition:
@@ -65,7 +71,6 @@ Resources:
                       - !Ref "AWS::AccountId"
                       - ':cluster/'
                       - !Ref BastionCluster
-
 
             # Only run tasks prefixed with 'bastion-'
             - Effect: Allow
@@ -136,10 +141,16 @@ Resources:
       Policies:
         - Version: '2012-10-17'
           Statement:
+            # List ALL task definitions (can't limit per-cluster)
+            - Effect: Allow
+              Action:
+                - 'ecs:ListTaskDefinitions'
+              Resource: '*'
+
             # List and Describe all ECS tasks in the bastion cluster
             - Effect: Allow
               Action:
-                - 'ecs:ListTask*'
+                - 'ecs:ListTask'
                 - 'ecs:DescribeTask*'
               Resource: '*'
               Condition:
@@ -213,10 +224,16 @@ Resources:
                 - 'ec2:DescribeSecurityGroups'
               Resource: '*'
 
+            # List ALL task definitions (can't limit per-cluster)
+            - Effect: Allow
+              Action:
+                - 'ecs:ListTaskDefinitions'
+              Resource: '*'
+
             # List and Describe all ECS tasks in the bastion cluster
             - Effect: Allow
               Action:
-                - 'ecs:ListTask*'
+                - 'ecs:ListTask'
                 - 'ecs:DescribeTask*'
               Resource: '*'
               Condition:
