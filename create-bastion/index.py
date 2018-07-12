@@ -34,7 +34,8 @@ def lambda_handler(event, context):
 
     bastion_name = 'bastion-' + user
 
-    # Ensure Security Group exists
+    # Each time, delete and recreate the security group
+    # This handles situation where e.g. client ip changes
     sg_response = ec2.describe_security_groups(
         Filters=[
             {'Name': 'vpc-id', 'Values': [vpc]},
@@ -43,23 +44,24 @@ def lambda_handler(event, context):
     )
     if sg_response.get('SecurityGroups'):
         sg = sg_response.get('SecurityGroups')[0]['GroupId']
-    else:
-        # Create the security group
-        sg_response = ec2.create_security_group(
-            Description='Bastion access for ' + user,
-            GroupName=bastion_name,
-            VpcId=vpc
-        )
-        sg = sg_response['GroupId']
+        ec2.delete_security_group(GroupId=sg)
 
-        # Add the ingress rule to it
-        ec2.authorize_security_group_ingress(
-            CidrIp=ip,
-            FromPort=22,
-            GroupId=sg,
-            IpProtocol='tcp',
-            ToPort=22
-        )
+    # Create the security group
+    sg_response = ec2.create_security_group(
+        Description='Bastion access for ' + user,
+        GroupName=bastion_name,
+        VpcId=vpc
+    )
+    sg = sg_response['GroupId']
+
+    # Add the ingress rule to it
+    ec2.authorize_security_group_ingress(
+        CidrIp=ip,
+        FromPort=22,
+        GroupId=sg,
+        IpProtocol='tcp',
+        ToPort=22
+    )
 
     try:
         # Check if everything already exists, if so return that
