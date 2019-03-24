@@ -27,15 +27,6 @@ Parameters:
     AllowedPattern: ^[-_A-Za-z0-9]*$
     ConstraintDescription: CodeBuild names must be 2 to 255 characters. They can include letters, numbers, and the special characters - and _.
     Type: String
-  CodeBuildVPC:
-    Description: The ID of the VPC to run Codebuild in
-    Type: AWS::EC2::VPC::Id
-  CodeBuildSubnets:
-    Description: A list of private subnets (requires a NAT Gateway)
-    Type: List<AWS::EC2::Subnet::Id>
-  CodeBuildSecurityGroups:
-    Description: A list of securitygroups (requires outgoing internet access)
-    Type: List<AWS::EC2::SecurityGroup::Id>
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -44,9 +35,6 @@ Metadata:
         default: CodeBuild information
       Parameters:
       - CodeBuildName
-      - CodeBuildVPC
-      - CodeBuildSubnets
-      - CodeBuildSecurityGroups
       - SourceCodeUrl
       - CodeBuildSpecFile
     - Label:
@@ -60,10 +48,10 @@ Resources:
     Type: AWS::CodeBuild::Project
     Properties:
       Name: !Ref CodeBuildName
-      ServiceRole: !Ref CodeBuildRole
+      ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: NO_ARTIFACTS
-      BadgeEnabled: 'true'
+      BadgeEnabled: true
       Environment:
         Type: LINUX_CONTAINER
         ComputeType: BUILD_GENERAL1_SMALL
@@ -83,10 +71,6 @@ Resources:
         Location: !Ref SourceCodeUrl
         BuildSpec: !Ref CodeBuildSpecFile
       TimeoutInMinutes: 10
-      VpcConfig:
-        VpcId: !Ref CodeBuildVPC
-        Subnets: !Ref CodeBuildSubnets
-        SecurityGroupIds: !Ref CodeBuildSecurityGroups
   CodeBuildRole:
       Type: AWS::IAM::Role
       Properties:
