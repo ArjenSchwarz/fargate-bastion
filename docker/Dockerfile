@@ -10,6 +10,6 @@ RUN ssh-keygen -A && \
     curl --silent --location "https://github.com/weaveworks/eksctl/releases/download/latest_release/eksctl_linux_amd64.tar.gz" | tar xz -C /usr/local/bin/ && \
     mkdir /root/.ssh
 COPY ./.bash_profile /root/.bash_profile
-# COPY ./publickey /root/.ssh/authorized_keys
-# RUN chmod 0600 /root/.ssh/authorized_keys
+COPY ./publickey /root/.ssh/authorized_keys
+RUN chmod 0600 /root/.ssh/authorized_keys
 CMD /usr/sbin/sshd -D -e
