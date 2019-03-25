@@ -28,6 +28,7 @@ def failResponse(error):
 
 def lambda_handler(event, context):
     user = event['queryStringParameters']['user']
+    cluster = event['queryStringParameters']['cluster']
     ip = event['requestContext']['identity']['sourceIp'] + "/32"
     ec2 = boto3.client('ec2')
     ecs = boto3.client('ecs')
@@ -89,6 +90,27 @@ def lambda_handler(event, context):
         IpProtocol='tcp',
         ToPort=22
     )
+
+    # Grant ControlPlaneSecurityGroup access from new securitygroup
+    if  cluster != "":
+        groups = ec2.describe_security_groups(
+            Filters=[
+                {'Name': 'vpc-id', 'Values': [vpc]},
+                {'Name': 'tag:aws:cloudformation:logical-id', 'Values': ['ControlPlaneSecurityGroup']},
+                {'Name': 'tag:eksctl.cluster.k8s.io/v1alpha1/cluster-name', 'Values': [cluster]}
+            ]
+        )
+
+        controlplanesg = groups['SecurityGroups'][0]['GroupId']
+        ec2.authorize_security_group_ingress(
+            IpPermissions=[
+                {'IpProtocol': 'tcp',
+                'FromPort': 443,
+                'ToPort': 443,
+                'UserIdGroupPairs': [{ 'GroupId': sg }] }],
+            GroupId=controlplanesg,
+        )
+
 
     # Start the bastion container
     response = ecs.run_task(

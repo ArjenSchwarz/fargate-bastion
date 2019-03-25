@@ -72,6 +72,7 @@ def lambda_handler(event, context):
                     ]
                 )
         print("Task is deleted")
+
         # Now find the security group to delete
         security_group = ec2.describe_security_groups(
             Filters=[
@@ -80,9 +81,27 @@ def lambda_handler(event, context):
             ]
         )
         for group in security_group['SecurityGroups']:
+            # Find all the groups that can be accessed by this group
+            refgroups = ec2.describe_security_groups(
+                Filters=[
+                    {'Name': 'vpc-id', 'Values': [vpc]},
+                    {'Name': 'ip-permission.group-id', 'Values': [group['GroupId']]}
+                ]
+            )
+            for refgroup in refgroups['SecurityGroups']:
+                ec2.authorize_security_group_ingress(
+                    IpPermissions=[
+                        {'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
+                        'UserIdGroupPairs': [{ 'GroupId': group['GroupId'] }] }],
+                    GroupId=refgroup['GroupId'],
+                )
+            # Delete the actual group
             ec2.delete_security_group(GroupId=group['GroupId'])
 
         print("Groups are deleted")
+
 
     except ClientError as e:
         if e.response['Error']['Code'] == 'InvalidGroup.NotFound':

@@ -90,6 +90,22 @@ def lambda_handler(event, context):
             ]
         )
         for group in security_group['SecurityGroups']:
+            # Find all the groups that can be accessed by this group
+            refgroups = ec2.describe_security_groups(
+                Filters=[
+                    {'Name': 'vpc-id', 'Values': [vpc]},
+                    {'Name': 'ip-permission.group-id', 'Values': [group['GroupId']]}
+                ]
+            )
+            for refgroup in refgroups['SecurityGroups']:
+                ec2.revoke_security_group_ingress(
+                    IpPermissions=[
+                        {'IpProtocol': 'tcp',
+                        'FromPort': 443,
+                        'ToPort': 443,
+                        'UserIdGroupPairs': [{ 'GroupId': group['GroupId'] }] }],
+                    GroupId=refgroup['GroupId'],
+                )
             ec2.delete_security_group(GroupId=group['GroupId'])
 
         print("Groups are deleted")
