@@ -9,7 +9,7 @@ RUN ssh-keygen -A && \
     chmod +x /usr/local/bin/aws-iam-authenticator && \
     curl --silent --location "https://github.com/weaveworks/eksctl/releases/download/latest_release/eksctl_linux_amd64.tar.gz" | tar xz -C /usr/local/bin/ && \
     mkdir /root/.ssh
-COPY ./.bashrc /root/.bashrc
-COPY ./publickey /root/.ssh/authorized_keys
-RUN chmod 0600 /root/.ssh/authorized_keys
+COPY ./.bash_profile /root/.bash_profile
+# COPY ./publickey /root/.ssh/authorized_keys
+# RUN chmod 0600 /root/.ssh/authorized_keys
 CMD /usr/sbin/sshd -D -e
