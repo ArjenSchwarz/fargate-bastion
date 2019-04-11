@@ -45,6 +45,7 @@ Resources:
                 - 'ec2:DescribeSecurityGroups'
                 - 'ec2:AuthorizeSecurityGroupIngress'
                 - 'ec2:CreateSecurityGroup'
+                - 'ec2:DeleteSecurityGroup'
               Resource: '*'
             - Effect: Allow
               Action:
