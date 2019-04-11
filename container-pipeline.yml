@@ -87,6 +87,55 @@ Resources:
         VpcId: !Ref CodeBuildVPC
         Subnets: !Ref CodeBuildSubnets
         SecurityGroupIds: !Ref CodeBuildSecurityGroups
+
+  ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub
+        - 'bastion-${BastionUser}'
+        - BastionUser: !Ref BastionUser
+      RequiresCompatibilities:
+        - FARGATE
+      NetworkMode: awsvpc
+      Cpu: 256
+      Memory: 512
+      ExecutionRoleArn: !GetAtt ECSTaskRole.Arn
+      ContainerDefinitions:
+        - Name: bastion
+          Image: !Sub
+            - '${AccountId}.dkr.ecr.${Region}.amazonaws.com/${BastionECRRepositoryName}:${BastionUser}'
+            - AccountId: !Ref 'AWS::AccountId'
+              Region: !Ref 'AWS::Region'
+              BastionECRRepositoryName: !Ref BastionECRRepositoryName
+              BastionUser: !Ref BastionUser
+          PortMappings:
+            - ContainerPort: 22
+
+  ECSTaskRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+          Version: '2012-10-17'
+        Policies:
+          - PolicyName: CodeBuildAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - ecr:GetAuthorizationToken
+                    - ecr:BatchCheckLayerAvailability
+                    - ecr:GetDownloadUrlForLayer
+                    - ecr:BatchGetImage
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: '*'
+
   CodeBuildRole:
       Type: AWS::IAM::Role
       Properties:
@@ -154,3 +203,10 @@ Resources:
 Outputs:
   CodeBuildProject:
     Value: !Ref CodeBuildProject
+  Image:
+    Value: !Sub
+      - '${AccountId}.dkr.ecr.${Region}.amazonaws.com/${BastionECRRepositoryName}:${BastionUser}'
+      - AccountId: !Ref 'AWS::AccountId'
+        Region: !Ref 'AWS::Region'
+        BastionECRRepositoryName: !Ref BastionECRRepositoryName
+        BastionUser: !Ref BastionUser
